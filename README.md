@@ -16,7 +16,7 @@ AI+测试平台是一套面向测试团队的智能测试工作台，目标是�
 
 接口设计文档、真实环境变量、本地数据库、缓存、构建产物和依赖目录不会提交到仓库。
 
-## 使用方式一：Windows 便携版
+## 使用方式一：Windows 一键启动版
 
 适合希望“下载后双击运行”的场景，不需要 Docker Desktop。
 
@@ -35,7 +35,16 @@ http://127.0.0.1:3000
 admin / 123456
 ```
 
-便携版会在 `runtime/data` 下创建本地 SQLite 数据库，在 `runtime/logs` 下写入运行日志。关闭启动器窗口会停止前端和后端服务。
+启动器采用轻量在线安装方式：压缩包不再内置 `node_modules`、Python 虚拟环境和 Playwright 浏览器内核，第一次运行会自动执行前端依赖安装、后端依赖安装、Web 构建和 Chromium 下载。首次运行需要网络，时间取决于 npm、PyPI 和 Playwright 下载速度；完成后依赖会保存在本地目录，后续启动会快很多。
+
+本机需要已有：
+
+```text
+Node.js 20+
+Python 3.11+
+```
+
+运行数据会保存在 `runtime/data`，日志会写入 `runtime/logs`。如果首次安装失败，先看 `runtime/logs/install.log`；网络恢复或装好缺少的运行环境后，再双击 `AI-Test-Platform.exe` 会继续安装。
 
 ### 配置 AI 模型
 
@@ -118,4 +127,4 @@ powershell -ExecutionPolicy Bypass -File scripts/docker-run.ps1 -NoCache -ForceR
 
 AI Test Platform is an intelligent testing workspace for QA teams. It combines requirements analysis, test case design, API testing, UI automation, performance testing, security scanning, reporting, and an AI assistant in one platform.
 
-Use the Windows portable package from GitHub Releases if you want to run it by double-clicking `AI-Test-Platform.exe` without Docker. Use the Docker scripts if you want the full Docker Compose deployment with PostgreSQL, Redis, Nginx, backend, web, runners, and MCP service.
+Use the Windows package from GitHub Releases if you want to start the platform by double-clicking `AI-Test-Platform.exe` without Docker. The package is intentionally lightweight: on the first run it installs npm packages, Python packages, builds the Next.js web app, and downloads the Playwright Chromium browser. Node.js 20+ and Python 3.11+ must already be available on the machine. Use the Docker scripts if you want the full Docker Compose deployment with PostgreSQL, Redis, Nginx, backend, web, runners, and MCP service.

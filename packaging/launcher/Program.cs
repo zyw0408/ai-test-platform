@@ -7,26 +7,23 @@ var runtimeRoot = Path.Combine(root, "runtime");
 var logsRoot = Path.Combine(runtimeRoot, "logs");
 var dataRoot = Path.Combine(runtimeRoot, "data");
 var artifactsRoot = Path.Combine(dataRoot, "artifacts");
+var pythonVenvRoot = Path.Combine(runtimeRoot, "python");
+var pythonExe = Path.Combine(pythonVenvRoot, "Scripts", "python.exe");
+var playwrightRoot = Path.Combine(runtimeRoot, "ms-playwright");
+var configPath = Path.Combine(runtimeRoot, "config.env");
+
 Directory.CreateDirectory(logsRoot);
 Directory.CreateDirectory(dataRoot);
 Directory.CreateDirectory(artifactsRoot);
-
-var nodeExe = Path.Combine(runtimeRoot, "node", "node.exe");
-var pythonExe = Path.Combine(runtimeRoot, "python", "python.exe");
-var webRoot = Path.Combine(appRoot, "web");
-var webServer = Path.Combine(webRoot, "apps", "web", "server.js");
-var apiRoot = appRoot;
-var uiRunnerDir = Path.Combine(appRoot, "workers", "ui-runner");
-var configPath = Path.Combine(runtimeRoot, "config.env");
+Directory.CreateDirectory(playwrightRoot);
 
 Console.Title = "AI Test Platform";
 Console.OutputEncoding = System.Text.Encoding.UTF8;
-Console.WriteLine("AI Test Platform portable launcher");
+Console.WriteLine("AI Test Platform launcher");
 Console.WriteLine($"Root: {root}");
+Console.WriteLine();
 
-RequireFile(nodeExe, "Node runtime not found");
-RequireFile(pythonExe, "Python runtime not found");
-RequireFile(webServer, "Next.js standalone server not found");
+RequireDirectory(appRoot, "Application files not found");
 RequireDirectory(Path.Combine(appRoot, "services", "ai-service"), "Backend service not found");
 
 var config = LoadConfig(configPath);
@@ -34,6 +31,21 @@ var apiPort = GetValue(config, "AI_TEST_API_PORT", "8000");
 var webPort = GetValue(config, "AI_TEST_WEB_PORT", "3000");
 var apiUrl = $"http://127.0.0.1:{apiPort}";
 var webUrl = $"http://127.0.0.1:{webPort}";
+
+var nodeExe = ResolveTool("node.exe", "node");
+var npmExe = ResolveTool("npm.cmd", "npm");
+var pythonLauncher = ResolveTool("py.exe", "py", required: false);
+var systemPython = ResolveTool("python.exe", "python", required: false);
+
+Bootstrap(nodeExe, npmExe, pythonLauncher, systemPython, apiUrl, webPort, logsRoot);
+
+var webRoot = Path.Combine(appRoot, "apps", "web", ".next", "standalone");
+var webServer = Path.Combine(webRoot, "apps", "web", "server.js");
+var apiRoot = appRoot;
+var uiRunnerDir = Path.Combine(appRoot, "workers", "ui-runner");
+
+RequireFile(pythonExe, "Python virtual environment is not ready");
+RequireFile(webServer, "Next.js standalone server is not ready");
 
 var apiEnv = new Dictionary<string, string?>
 {
@@ -56,7 +68,7 @@ var apiEnv = new Dictionary<string, string?>
     ["AI_SERVICE_DEFAULT_ADMIN_USERNAME"] = GetValue(config, "AI_SERVICE_DEFAULT_ADMIN_USERNAME", "admin"),
     ["AI_SERVICE_DEFAULT_ADMIN_PASSWORD"] = GetValue(config, "AI_SERVICE_DEFAULT_ADMIN_PASSWORD", "123456"),
     ["AI_SERVICE_DEFAULT_ADMIN_NAME"] = GetValue(config, "AI_SERVICE_DEFAULT_ADMIN_NAME", "超级管理员"),
-    ["PLAYWRIGHT_BROWSERS_PATH"] = Path.Combine(runtimeRoot, "ms-playwright"),
+    ["PLAYWRIGHT_BROWSERS_PATH"] = playwrightRoot,
 };
 
 var webEnv = new Dictionary<string, string?>
@@ -117,6 +129,98 @@ finally
     StopAll(processes);
 }
 
+void Bootstrap(
+    string nodeExe,
+    string npmExe,
+    string? pythonLauncher,
+    string? systemPython,
+    string apiUrl,
+    string webPort,
+    string logsRoot)
+{
+    var installLog = Path.Combine(logsRoot, "install.log");
+    var nodeModules = Path.Combine(appRoot, "node_modules");
+    var packageLock = Path.Combine(appRoot, "package-lock.json");
+    var webServer = Path.Combine(appRoot, "apps", "web", ".next", "standalone", "apps", "web", "server.js");
+
+    if (!Directory.Exists(nodeModules))
+    {
+        Console.WriteLine("Installing frontend dependencies. First run may take several minutes...");
+        var installCommand = File.Exists(packageLock) ? "ci" : "install";
+        RunChecked(npmExe, installCommand, appRoot, EmptyEnv(), installLog);
+    }
+
+    if (!File.Exists(webServer))
+    {
+        Console.WriteLine("Building web application...");
+        RunChecked(
+            npmExe,
+            "run build:web",
+            appRoot,
+            new Dictionary<string, string?>
+            {
+                ["PLATFORM_API_URL"] = apiUrl,
+                ["NEXT_PUBLIC_PLATFORM_API_URL"] = $"http://127.0.0.1:{webPort}",
+            },
+            installLog);
+        CopyNextStandaloneAssets();
+    }
+
+    if (!File.Exists(pythonExe))
+    {
+        Console.WriteLine("Creating Python virtual environment...");
+        Directory.CreateDirectory(pythonVenvRoot);
+        if (!string.IsNullOrWhiteSpace(pythonLauncher))
+        {
+            RunChecked(pythonLauncher, "-3.11 -m venv " + Quote(pythonVenvRoot), appRoot, EmptyEnv(), installLog);
+        }
+        else if (!string.IsNullOrWhiteSpace(systemPython))
+        {
+            RunChecked(systemPython, "-m venv " + Quote(pythonVenvRoot), appRoot, EmptyEnv(), installLog);
+        }
+        else
+        {
+            throw new InvalidOperationException("Python 3.11+ is required. Install Python and run AI-Test-Platform.exe again.");
+        }
+    }
+
+    var pythonReadyMarker = Path.Combine(pythonVenvRoot, ".ai-test-platform-deps-ready");
+    if (!File.Exists(pythonReadyMarker))
+    {
+        Console.WriteLine("Installing backend dependencies...");
+        RunChecked(pythonExe, "-m pip install --upgrade pip", appRoot, EmptyEnv(), installLog);
+        RunChecked(pythonExe, "-m pip install -e services/ai-service -e services/test-platform-mcp -e workers/api-runner", appRoot, EmptyEnv(), installLog);
+        File.WriteAllText(pythonReadyMarker, DateTimeOffset.Now.ToString("O"));
+    }
+
+    var chromiumMarker = Path.Combine(playwrightRoot, ".chromium-ready");
+    if (!File.Exists(chromiumMarker))
+    {
+        Console.WriteLine("Installing Playwright Chromium browser...");
+        RunChecked(
+            npmExe,
+            "--workspace workers/ui-runner exec playwright install chromium",
+            appRoot,
+            new Dictionary<string, string?> { ["PLAYWRIGHT_BROWSERS_PATH"] = playwrightRoot },
+            installLog);
+        File.WriteAllText(chromiumMarker, DateTimeOffset.Now.ToString("O"));
+    }
+}
+
+void CopyNextStandaloneAssets()
+{
+    var sourceStatic = Path.Combine(appRoot, "apps", "web", ".next", "static");
+    var targetStatic = Path.Combine(appRoot, "apps", "web", ".next", "standalone", "apps", "web", ".next", "static");
+    var sourcePublic = Path.Combine(appRoot, "apps", "web", "public");
+    var targetPublic = Path.Combine(appRoot, "apps", "web", ".next", "standalone", "apps", "web", "public");
+
+    CopyDirectory(sourceStatic, targetStatic);
+    if (Directory.Exists(sourcePublic))
+    {
+        CopyDirectory(sourcePublic, targetPublic);
+    }
+}
+
 static Process StartProcess(
     string fileName,
     string arguments,
@@ -124,21 +228,10 @@ static Process StartProcess(
     Dictionary<string, string?> environment,
     string logPath)
 {
-    var startInfo = new ProcessStartInfo
-    {
-        FileName = fileName,
-        Arguments = arguments,
-        WorkingDirectory = workingDirectory,
-        UseShellExecute = false,
-        RedirectStandardOutput = true,
-        RedirectStandardError = true,
-        CreateNoWindow = true,
-    };
-
-    foreach (var item in environment)
-    {
-        startInfo.Environment[item.Key] = item.Value ?? "";
-    }
+    var startInfo = CreateStartInfo(fileName, arguments, workingDirectory, environment);
+    startInfo.RedirectStandardOutput = true;
+    startInfo.RedirectStandardError = true;
+    startInfo.CreateNoWindow = true;
 
     var process = new Process { StartInfo = startInfo, EnableRaisingEvents = true };
     var logLock = new object();
@@ -152,6 +245,62 @@ static Process StartProcess(
     process.BeginErrorReadLine();
     return process;
 }
+
+static void RunChecked(
+    string fileName,
+    string arguments,
+    string workingDirectory,
+    Dictionary<string, string?> environment,
+    string logPath)
+{
+    var startInfo = CreateStartInfo(fileName, arguments, workingDirectory, environment);
+    startInfo.RedirectStandardOutput = true;
+    startInfo.RedirectStandardError = true;
+    startInfo.CreateNoWindow = true;
+
+    using var process = new Process { StartInfo = startInfo };
+    var logLock = new object();
+    process.OutputDataReceived += (_, e) => WriteLog(logPath, e.Data, logLock);
+    process.ErrorDataReceived += (_, e) => WriteLog(logPath, e.Data, logLock);
+
+    WriteLog(logPath, $"> {fileName} {arguments}", logLock);
+    if (!process.Start())
+    {
+        throw new InvalidOperationException($"Failed to start {fileName}");
+    }
+    process.BeginOutputReadLine();
+    process.BeginErrorReadLine();
+    process.WaitForExit();
+
+    if (process.ExitCode != 0)
+    {
+        throw new InvalidOperationException($"Command failed. See log: {logPath}");
+    }
+}
+
+static ProcessStartInfo CreateStartInfo(
+    string fileName,
+    string arguments,
+    string workingDirectory,
+    Dictionary<string, string?> environment)
+{
+    var startInfo = new ProcessStartInfo
+    {
+        FileName = fileName,
+        Arguments = arguments,
+        WorkingDirectory = workingDirectory,
+        UseShellExecute = false,
+    };
+
+    foreach (var item in environment)
+    {
+        startInfo.Environment[item.Key] = item.Value ?? "";
+    }
+
+    return startInfo;
+}
+
+static Dictionary<string, string?> EmptyEnv() => new();
 
 static void WriteLog(string logPath, string? line, object logLock)
 {
@@ -226,7 +375,8 @@ static Dictionary<string, string> LoadConfig(string path)
     {
         File.WriteAllLines(path, new[]
         {
-            "# AI Test Platform portable configuration",
+            "# AI Test Platform configuration",
+            "# First run installs dependencies from npm, PyPI, and Playwright.",
             "AI_TEST_API_PORT=8000",
             "AI_TEST_WEB_PORT=3000",
             "AI_SERVICE_MODEL_PROVIDER=openai-compatible",
@@ -262,6 +412,42 @@ static string GetValue(Dictionary<string, string> values, string key, string fal
         : fallback;
 }
 
+static string ResolveTool(string windowsName, string displayName, bool required = true)
+{
+    var path = FindOnPath(windowsName);
+    if (!string.IsNullOrWhiteSpace(path))
+    {
+        return path;
+    }
+
+    if (required)
+    {
+        throw new FileNotFoundException($"{displayName} was not found on PATH. Install Node.js 20+ and Python 3.11+, then run again.");
+    }
+    return "";
+}
+
+static string FindOnPath(string fileName)
+{
+    var paths = (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator);
+    foreach (var path in paths)
+    {
+        try
+        {
+            var candidate = Path.Combine(path.Trim('"'), fileName);
+            if (File.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+        catch
+        {
+            // Ignore malformed PATH entries.
+        }
+    }
+    return "";
+}
+
 static void RequireFile(string path, string message)
 {
     if (!File.Exists(path))
@@ -277,3 +463,24 @@ static void RequireDirectory(string path, string message)
         throw new DirectoryNotFoundException($"{message}: {path}");
     }
 }
+
+static void CopyDirectory(string source, string target)
+{
+    if (!Directory.Exists(source))
+    {
+        return;
+    }
+
+    Directory.CreateDirectory(target);
+    foreach (var directory in Directory.EnumerateDirectories(source, "*", SearchOption.AllDirectories))
+    {
+        Directory.CreateDirectory(directory.Replace(source, target));
+    }
+
+    foreach (var file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
+    {
+        File.Copy(file, file.Replace(source, target), overwrite: true);
+    }
+}
+
+static string Quote(string value) => "\"" + value.Replace("\"", "\\\"") + "\"";
