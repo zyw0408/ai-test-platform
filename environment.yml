@@ -1,0 +1,11 @@
+name: ai-test-platform
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+  - nodejs=22
+  - pip:
+      - -e services/ai-service
+      - -e workers/api-runner
+      - -e services/test-platform-mcp

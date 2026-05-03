@@ -1,0 +1,151 @@
+name: ai-test-platform
+
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      web:
+        condition: service_started
+    ports:
+      - "${NGINX_PORT:-80}:80"
+    volumes:
+      - ./nginx/conf.d/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./logs/nginx:/var/log/nginx
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    networks:
+      - ai-test-net
+
+  web:
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+      args:
+        PLATFORM_API_URL: ${PLATFORM_API_URL:-http://api:8000}
+        NEXT_PUBLIC_PLATFORM_API_URL: ${NEXT_PUBLIC_PLATFORM_API_URL:-http://localhost}
+    image: ai-test-platform-web:latest
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+      PLATFORM_API_URL: ${PLATFORM_API_URL:-http://api:8000}
+      NEXT_PUBLIC_PLATFORM_API_URL: ${NEXT_PUBLIC_PLATFORM_API_URL:-http://localhost}
+      AUTH_COOKIE_MAX_AGE_SECONDS: ${AUTH_COOKIE_MAX_AGE_SECONDS:-43200}
+      NEXT_PUBLIC_WECHAT_REGISTER_SCOPE: ${NEXT_PUBLIC_WECHAT_REGISTER_SCOPE:-snsapi_userinfo}
+    depends_on:
+      api:
+        condition: service_healthy
+    command:
+      - /bin/sh
+      - -lc
+      - |
+        mkdir -p /var/log/ai-test-platform
+        node apps/web/server.js 2>&1 | tee -a /var/log/ai-test-platform/web.log
+    volumes:
+      - ./logs/web:/var/log/ai-test-platform
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000/').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))\""]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - ai-test-net
+
+  api:
+    build:
+      context: ..
+      dockerfile: services/ai-service/Dockerfile
+    image: ai-test-platform-api:latest
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      AI_SERVICE_HOST: 0.0.0.0
+      AI_SERVICE_PORT: 8000
+      AI_SERVICE_STORAGE_DIR: /app-data
+      AI_SERVICE_ARTIFACTS_DIR: /app-data/artifacts
+      AI_SERVICE_DB_PATH: /app-data/platform.db
+      AI_SERVICE_DATABASE_URL: ${AI_SERVICE_DATABASE_URL:-postgresql://ai_test:ai_test_123456@postgres:5432/ai_test_platform}
+      AI_SERVICE_REDIS_URL: ${AI_SERVICE_REDIS_URL:-redis://redis:6379/0}
+      AI_SERVICE_CORS_ALLOW_ORIGINS: ${AI_SERVICE_CORS_ALLOW_ORIGINS:-http://localhost,http://127.0.0.1}
+      AI_SERVICE_UI_RUNNER_DIR: /app/workers/ui-runner
+      AI_SERVICE_NODE_BIN: node
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command:
+      - /bin/sh
+      - -lc
+      - |
+        mkdir -p /var/log/ai-test-platform /app-data/artifacts
+        python -m uvicorn app.main:app --app-dir services/ai-service --host 0.0.0.0 --port 8000 --proxy-headers 2>&1 | tee -a /var/log/ai-test-platform/api.log
+    volumes:
+      - ./api/data:/app-data
+      - ./logs/api:/var/log/ai-test-platform
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 25s
+    networks:
+      - ai-test-net
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ai_test}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ai_test_123456}
+      POSTGRES_DB: ${POSTGRES_DB:-ai_test_platform}
+      PGDATA: /var/lib/postgresql/data/pgdata
+      TZ: ${TZ:-Asia/Shanghai}
+    command:
+      - postgres
+      - -c
+      - config_file=/etc/postgresql/postgresql.conf
+    volumes:
+      - ./postgres/data:/var/lib/postgresql/data
+      - ./postgres/conf/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+      - ./database-init:/docker-entrypoint-initdb.d:ro
+      - ./logs/postgres:/var/log/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ai_test} -d ${POSTGRES_DB:-ai_test_platform}"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    networks:
+      - ai-test-net
+
+  redis:
+    image: redis:7.2-alpine
+    restart: unless-stopped
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    volumes:
+      - ./redis/conf/redis.conf:/usr/local/etc/redis/redis.conf:ro
+      - ./redis/data:/data
+      - ./logs/redis:/var/log/redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    networks:
+      - ai-test-net
+
+networks:
+  ai-test-net:
+    driver: bridge

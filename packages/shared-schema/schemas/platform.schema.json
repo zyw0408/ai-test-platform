@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AI Test Platform Entities",
+  "type": "object",
+  "properties": {
+    "project": {
+      "type": "object",
+      "required": ["id", "name", "createdAt", "updatedAt"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      }
+    },
+    "sourceSpec": {
+      "type": "object",
+      "required": ["id", "projectId", "sourceType", "title", "content", "createdAt"],
+      "properties": {
+        "id": { "type": "string" },
+        "projectId": { "type": "string" },
+        "sourceType": { "enum": ["url", "file", "text"] },
+        "title": { "type": "string" },
+        "location": { "type": "string" },
+        "content": { "type": "string" },
+        "createdAt": { "type": "string" }
+      }
+    }
+  }
+}

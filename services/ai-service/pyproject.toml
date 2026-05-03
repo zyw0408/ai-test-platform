@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ai-test-platform-ai-service"
+version = "0.1.0"
+description = "FastAPI service for the AI test platform."
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115.0,<1.0.0",
+  "uvicorn>=0.34.0,<1.0.0",
+  "httpx>=0.28.0,<1.0.0",
+  "python-multipart>=0.0.20,<1.0.0",
+  "pydantic>=2.10.0,<3.0.0",
+  "redis>=5.2.0,<6.0.0",
+  "psycopg[binary]>=3.2.0,<4.0.0",
+  "psycopg-pool>=3.2.0,<4.0.0",
+  "cryptography>=44.0.0,<46.0.0",
+  "alibabacloud-dysmsapi20170525>=4.1.0,<5.0.0",
+  "alibabacloud-tea-openapi>=0.3.13,<1.0.0"
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=9.0.0,<10.0.0"
+]
+
+[tool.setuptools]
+package-dir = {"" = "."}
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"]

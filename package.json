@@ -1,0 +1,19 @@
+{
+  "name": "ai-test-platform",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "workers/ui-runner"
+  ],
+  "scripts": {
+    "dev:web": "npm --workspace apps/web run dev",
+    "build:web": "npm --workspace apps/web run build",
+    "lint:web": "npm --workspace apps/web run lint",
+    "typecheck:schema": "npm --workspace packages/shared-schema run typecheck",
+    "test:ui-runner": "npm --workspace workers/ui-runner run test",
+    "middleware:up": "powershell -ExecutionPolicy Bypass -File scripts/middleware-up.ps1",
+    "middleware:down": "powershell -ExecutionPolicy Bypass -File scripts/middleware-down.ps1"
+  }
+}
