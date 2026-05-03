@@ -3,6 +3,11 @@ node_modules/
 dist/
 build/
 coverage/
+docs/
+environment.yml
+pyproject.toml
+services/test-platform-mcp/
+workers/api-runner/
 __pycache__/
 .pytest_cache/
 .playwright-mcp/

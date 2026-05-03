@@ -1,124 +1,101 @@
-﻿# AI+测试平台
+# AI Test Platform / AI+测试平台
 
-面向企业测试团队的 AI 测试工作台，覆盖“项目/需求/用例/接口测试/自动化测试/性能测试/安全测试/报告”全流程。
+## 中文说明
 
-## 1. 项目结构
+AI+测试平台是一套面向企业测试团队的 Docker 化测试工作台，覆盖项目、需求、用例、接口测试、自动化测试、性能测试、安全测试与报告等核心流程。
 
-- `apps/web`：前端控制台（Next.js）
-- `services/ai-service`：后端 AI 与业务 API（FastAPI）
-- `services/test-platform-mcp`：平台 MCP 服务
-- `workers/api-runner`：API 执行器
-- `workers/ui-runner`：UI 执行器
-- `packages/shared-schema`：共享类型与协议
-- `infra`：中间件与部署相关配置
-- `docs`：项目文档
+### 仓库内容
 
-## 2. 当前核心能力
+本仓库只保留部署和运行所需内容：
 
-- 项目、需求、测试用例的增删改查
-- 接口测试集合管理、请求编排、执行与结果查看
-- AI 辅助：
-  - 需求分析与测试建议
-  - 工具调用（含 MCP 工具）
-  - 表单自动填充协议（`form_fill`）
-- 性能测试与安全扫描入口
-- 报告汇总与执行趋势查看
+- `apps/web`：Next.js 前端应用
+- `services/ai-service`：FastAPI 后端服务
+- `workers/ui-runner`：UI 自动化执行器
+- `packages/shared-schema`：前后端共享协议与类型
+- `docker-desktop`：Docker Compose、Nginx、PostgreSQL、Redis 与环境模板
+- `scripts`：Docker 构建、启动、停止脚本
 
-## 3. Docker 部署
+接口设计文档、开发环境缓存、本地数据库、真实环境变量和其他非交付文件不包含在仓库中。
 
-### 3.1 准备
+### 快速启动
 
-- 安装 Docker Desktop（需支持 `docker compose`）
-- 按需修改 `docker-desktop/.env`；如果文件不存在，脚本会自动由示例文件生成
-
-示例环境文件：
-
-- `docker-desktop/.env.example`
-
-### 3.2 构建镜像
-
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts/docker-build.ps1
-```
-
-### 3.3 启动服务
+1. 安装 Docker Desktop，并确认支持 `docker compose`。
+2. 在仓库根目录执行：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/docker-run.ps1
 ```
 
-前端改动后建议强制重建 `web` 与 `nginx`：
+3. 打开：
 
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts/docker-run.ps1 -NoCache -ForceRecreate -Services web nginx
+```text
+http://localhost
 ```
 
-默认会启动以下服务：
-
-- `nginx`：统一入口与反向代理
-- `web`：Next.js 前端
-- `api`：FastAPI 后端
-- `postgres`：PostgreSQL
-- `redis`：Redis
-
-默认访问地址：
-
-- 前端入口：`http://localhost`
-- 后端由 `nginx` 转发给前端应用，前端再访问内部 `api`
-
-### 3.4 停止服务
+### 常用命令
 
 ```powershell
+powershell -ExecutionPolicy Bypass -File scripts/docker-build.ps1
+powershell -ExecutionPolicy Bypass -File scripts/docker-run.ps1
 powershell -ExecutionPolicy Bypass -File scripts/docker-down.ps1
 ```
 
-## 4. 目录说明
-
-- `apps/web`：前端应用及其 Dockerfile
-- `services/ai-service`：主后端服务及其 Dockerfile
-- `services/test-platform-mcp`：MCP 服务
-- `workers/api-runner`：API 执行器
-- `workers/ui-runner`：UI 自动化执行器
-- `packages/shared-schema`：前后端共享类型
-- `docker-desktop`：Compose、环境文件、nginx/postgres/redis 配置、日志与数据映射目录
-- `docs/api`：接口文档
-- `scripts`：仅保留 Docker 构建、启动、停止脚本
-
-## 5. 默认访问与账号
-
-- 前端默认地址：`http://localhost`
-- 内部后端服务地址：`http://api:8000`
-- 默认管理员（如未改环境变量）：
-  - 用户名：`admin`
-  - 密码：`123456`
-
-## 6. 关键环境变量
-
-请参考：
-
-- `apps/web/.env.local.example`
-- `services/ai-service/.env.example`
-- `services/test-platform-mcp/.env.example`
-- `docker-desktop/.env.example`
-
-## 7. MCP 与 AI 配置建议
-
-- 内置 MCP 建议保持只读基础能力（filesystem/fetch/playwright）
-- 外部 MCP 通过设置页搜索并安装（npm 包）
-- 自定义规则（custom rules）建议按“身份、语气、输出结构、禁用项、执行边界”分条维护
-
-## 8. 说明
-
-仓库当前只保留 Docker 交付路径，不再维护旧的 zip 打包脚本与本地中间件快捷脚本。
-
-## 9. Docker 异常恢复
-
-如果出现 `docker ... 500 Internal Server Error`，通常是 Docker Desktop Linux Engine 或镜像存储层异常。处理顺序：
-
-1. Docker Desktop -> Troubleshoot -> `Clean / Purge data`
-2. 若仍失败，执行 `Reset to factory defaults`
-3. 然后重跑：
+如需强制重建前端与网关：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/docker-run.ps1 -NoCache -ForceRecreate -Services web nginx
 ```
+
+### 环境变量
+
+首次运行脚本时，如果 `docker-desktop/.env` 不存在，会自动从 `docker-desktop/.env.example` 生成。真实 `.env` 文件不会提交到仓库。
+
+## English
+
+AI Test Platform is a Dockerized testing workspace for enterprise QA teams. It covers project management, requirements, test cases, API testing, UI automation, performance testing, security testing, and reporting workflows.
+
+### Repository Scope
+
+This repository keeps only the files required for deployment and runtime:
+
+- `apps/web`: Next.js web application
+- `services/ai-service`: FastAPI backend service
+- `workers/ui-runner`: UI automation runner
+- `packages/shared-schema`: shared contracts and types
+- `docker-desktop`: Docker Compose, Nginx, PostgreSQL, Redis, and environment templates
+- `scripts`: Docker build, start, and stop scripts
+
+API design documents, local caches, local databases, real environment files, and other non-delivery artifacts are excluded.
+
+### Quick Start
+
+1. Install Docker Desktop and make sure `docker compose` is available.
+2. Run from the repository root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/docker-run.ps1
+```
+
+3. Open:
+
+```text
+http://localhost
+```
+
+### Useful Commands
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/docker-build.ps1
+powershell -ExecutionPolicy Bypass -File scripts/docker-run.ps1
+powershell -ExecutionPolicy Bypass -File scripts/docker-down.ps1
+```
+
+To rebuild the web app and gateway from scratch:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/docker-run.ps1 -NoCache -ForceRecreate -Services web nginx
+```
+
+### Environment
+
+On first run, the scripts create `docker-desktop/.env` from `docker-desktop/.env.example` if it does not exist. Real `.env` files are not committed.
