@@ -102,6 +102,34 @@ services:
     networks:
       - ai-test-net
 
+  mcp:
+    build:
+      context: ..
+      dockerfile: services/test-platform-mcp/Dockerfile
+    image: ai-test-platform-mcp:latest
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      TEST_PLATFORM_API_URL: ${TEST_PLATFORM_API_URL:-http://api:8000}
+      TEST_PLATFORM_API_TOKEN: ${TEST_PLATFORM_API_TOKEN:-}
+      TEST_PLATFORM_MCP_HOST: 0.0.0.0
+      TEST_PLATFORM_MCP_PORT: 8765
+      TEST_PLATFORM_MCP_TRANSPORT: sse
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${MCP_PORT:-8765}:8765"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8765/sse')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - ai-test-net
+
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped

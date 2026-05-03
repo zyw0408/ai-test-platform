@@ -5,9 +5,7 @@ build/
 coverage/
 docs/
 environment.yml
-pyproject.toml
-services/test-platform-mcp/
-workers/api-runner/
+/pyproject.toml
 __pycache__/
 .pytest_cache/
 .playwright-mcp/

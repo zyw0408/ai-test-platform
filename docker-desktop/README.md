@@ -13,6 +13,15 @@
 - `api/data/`：后端业务数据、产物落盘目录
 - `logs/`：各服务日志目录
 
+## 部署服务
+
+- `nginx`：统一入口与反向代理
+- `web`：前端控制台
+- `api`：后端业务与 AI 服务，镜像内包含 API runner 与 UI runner
+- `mcp`：AI 助手工具桥，默认以 SSE 方式暴露平台 MCP 工具
+- `postgres`：业务数据库
+- `redis`：缓存、队列与向量检索后端
+
 ## 常用脚本
 
 在仓库根目录执行：
@@ -26,3 +35,4 @@ powershell -ExecutionPolicy Bypass -File scripts/docker-down.ps1
 ## 访问地址
 
 - 平台入口：`http://localhost`
+- MCP SSE：`http://localhost:8765/sse`

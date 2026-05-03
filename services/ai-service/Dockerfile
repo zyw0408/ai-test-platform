@@ -21,10 +21,13 @@ RUN cd /app/workers/ui-runner && npm install
 RUN cd /app/workers/ui-runner && npx playwright install --with-deps chromium
 
 COPY services/ai-service ./services/ai-service
+COPY workers/api-runner ./workers/api-runner
 COPY workers/ui-runner ./workers/ui-runner
 
 RUN pip install -e ./services/ai-service
+RUN pip install -e ./workers/api-runner
 RUN python -m compileall -q /app/services/ai-service/app
+RUN python -m compileall -q /app/workers/api-runner/src
 
 ENV AI_SERVICE_HOST=0.0.0.0
 ENV AI_SERVICE_PORT=8000
