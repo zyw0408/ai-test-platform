@@ -6,6 +6,9 @@ coverage/
 docs/
 environment.yml
 /pyproject.toml
+release/
+packaging/**/bin/
+packaging/**/obj/
 __pycache__/
 .pytest_cache/
 .playwright-mcp/

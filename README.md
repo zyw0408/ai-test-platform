@@ -1,25 +1,64 @@
 # AI Test Platform / AI+测试平台
 
-## 中文说明
+## 项目介绍
 
-AI+测试平台是一套面向企业测试团队的 Docker 化测试工作台，覆盖项目、需求、用例、接口测试、自动化测试、性能测试、安全测试与报告等核心流程。
+AI+测试平台是一套面向测试团队的智能测试工作台，目标是把需求分析、测试用例设计、接口测试、UI 自动化、性能测试、安全扫描、报告汇总和 AI 助手放在一个统一平台里。
 
-### 仓库内容
+平台包含：
 
-本仓库只保留部署和运行所需内容：
+- Web 控制台：项目、需求、用例、接口测试、自动化测试、报告与设置页面
+- AI 后端服务：对接 OpenAI 兼容模型，提供 AI 对话、需求分析、测试建议和工具调用能力
+- MCP 工具服务：让 AI 助手可以调用平台能力，例如项目、需求、用例、执行、报告和安全扫描
+- API runner：执行接口测试用例
+- UI runner：基于 Playwright 执行 UI 自动化用例
+- Docker 部署配置：适合服务器或开发环境统一部署
+- Windows 便携包：适合没有 Docker 的 Windows 机器双击启动
 
-- `apps/web`：Next.js 前端应用
-- `services/ai-service`：FastAPI 后端服务
-- `services/test-platform-mcp`：AI 助手调用平台能力的 MCP 工具服务
-- `workers/api-runner`：接口测试执行器
-- `workers/ui-runner`：UI 自动化执行器
-- `packages/shared-schema`：前后端共享协议与类型
-- `docker-desktop`：Docker Compose、Nginx、PostgreSQL、Redis 与环境模板
-- `scripts`：Docker 构建、启动、停止脚本
+接口设计文档、真实环境变量、本地数据库、缓存、构建产物和依赖目录不会提交到仓库。
 
-接口设计文档、开发环境缓存、本地数据库、真实环境变量和其他非交付文件不包含在仓库中。Docker 部署会包含 Web、后端 AI 服务、MCP 工具服务、API runner、UI runner、PostgreSQL、Redis 与 Nginx。
+## 使用方式一：Windows 便携版
 
-### 快速启动
+适合希望“下载后双击运行”的场景，不需要 Docker Desktop。
+
+1. 在 GitHub Releases 下载 `AI-Test-Platform-Portable.zip`。
+2. 解压压缩包。
+3. 双击 `AI-Test-Platform.exe`。
+4. 浏览器会自动打开：
+
+```text
+http://127.0.0.1:3000
+```
+
+默认账号：
+
+```text
+admin / 123456
+```
+
+便携版会在 `runtime/data` 下创建本地 SQLite 数据库，在 `runtime/logs` 下写入运行日志。关闭启动器窗口会停止前端和后端服务。
+
+### 配置 AI 模型
+
+首次启动会生成：
+
+```text
+runtime/config.env
+```
+
+如果使用本机 CPAMC 代理，通常这样配置：
+
+```env
+AI_SERVICE_MODEL_PROVIDER=openai-compatible
+AI_SERVICE_MODEL_BASE_URL=http://127.0.0.1:8317/v1
+AI_SERVICE_MODEL_NAME=gpt-5.4-mini
+AI_SERVICE_MODEL_API_KEY=你的密钥
+```
+
+保存后重新双击 `AI-Test-Platform.exe` 启动即可。
+
+## 使用方式二：Docker Desktop 部署
+
+适合需要 PostgreSQL、Redis、Nginx、MCP 服务一起编排的完整部署场景。
 
 1. 安装 Docker Desktop，并确认支持 `docker compose`。
 2. 在仓库根目录执行：
@@ -34,13 +73,22 @@ powershell -ExecutionPolicy Bypass -File scripts/docker-run.ps1
 http://localhost
 ```
 
-MCP 工具服务默认暴露在：
+Docker 部署会启动：
+
+- `nginx`：统一入口与反向代理
+- `web`：前端控制台
+- `api`：后端业务与 AI 服务
+- `mcp`：AI 助手 MCP 工具服务
+- `postgres`：业务数据库
+- `redis`：缓存、队列与向量检索后端
+
+MCP SSE 地址：
 
 ```text
 http://localhost:8765/sse
 ```
 
-### 常用命令
+常用命令：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/docker-build.ps1
@@ -54,64 +102,20 @@ powershell -ExecutionPolicy Bypass -File scripts/docker-down.ps1
 powershell -ExecutionPolicy Bypass -File scripts/docker-run.ps1 -NoCache -ForceRecreate -Services web nginx
 ```
 
-### 环境变量
+## 目录说明
 
-首次运行脚本时，如果 `docker-desktop/.env` 不存在，会自动从 `docker-desktop/.env.example` 生成。真实 `.env` 文件不会提交到仓库。
+- `apps/web`：Next.js 前端应用
+- `services/ai-service`：FastAPI 后端服务
+- `services/test-platform-mcp`：AI 助手 MCP 工具服务
+- `workers/api-runner`：接口测试执行器
+- `workers/ui-runner`：UI 自动化执行器
+- `packages/shared-schema`：共享协议与类型
+- `docker-desktop`：Docker Compose、Nginx、PostgreSQL、Redis 与环境模板
+- `scripts`：Docker 构建、启动、停止脚本
+- `packaging/launcher`：Windows 便携版启动器源码
 
 ## English
 
-AI Test Platform is a Dockerized testing workspace for enterprise QA teams. It covers project management, requirements, test cases, API testing, UI automation, performance testing, security testing, and reporting workflows.
+AI Test Platform is an intelligent testing workspace for QA teams. It combines requirements analysis, test case design, API testing, UI automation, performance testing, security scanning, reporting, and an AI assistant in one platform.
 
-### Repository Scope
-
-This repository keeps only the files required for deployment and runtime:
-
-- `apps/web`: Next.js web application
-- `services/ai-service`: FastAPI backend service
-- `services/test-platform-mcp`: MCP tool service used by the AI assistant
-- `workers/api-runner`: API test runner
-- `workers/ui-runner`: UI automation runner
-- `packages/shared-schema`: shared contracts and types
-- `docker-desktop`: Docker Compose, Nginx, PostgreSQL, Redis, and environment templates
-- `scripts`: Docker build, start, and stop scripts
-
-API design documents, local caches, local databases, real environment files, and other non-delivery artifacts are excluded. The Docker deployment includes the web app, backend AI service, MCP tool service, API runner, UI runner, PostgreSQL, Redis, and Nginx.
-
-### Quick Start
-
-1. Install Docker Desktop and make sure `docker compose` is available.
-2. Run from the repository root:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts/docker-run.ps1
-```
-
-3. Open:
-
-```text
-http://localhost
-```
-
-The MCP tool service is exposed at:
-
-```text
-http://localhost:8765/sse
-```
-
-### Useful Commands
-
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts/docker-build.ps1
-powershell -ExecutionPolicy Bypass -File scripts/docker-run.ps1
-powershell -ExecutionPolicy Bypass -File scripts/docker-down.ps1
-```
-
-To rebuild the web app and gateway from scratch:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts/docker-run.ps1 -NoCache -ForceRecreate -Services web nginx
-```
-
-### Environment
-
-On first run, the scripts create `docker-desktop/.env` from `docker-desktop/.env.example` if it does not exist. Real `.env` files are not committed.
+Use the Windows portable package from GitHub Releases if you want to run it by double-clicking `AI-Test-Platform.exe` without Docker. Use the Docker scripts if you want the full Docker Compose deployment with PostgreSQL, Redis, Nginx, backend, web, runners, and MCP service.
